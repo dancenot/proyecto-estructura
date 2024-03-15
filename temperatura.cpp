@@ -47,7 +47,7 @@ double promedioDia(char* fecha) {
         }
         aux = aux->sig;
     }
-    return -1;  // Retorna -1 si la fecha no se encuentra en los registros
+    return -1;
 }
 
 double promedioTotal() {
