@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <stdbool.h>
 // Estructura representa la fecha
 typedef struct {
     int dia;
@@ -18,7 +18,17 @@ typedef struct Tree {
     struct Tree* der;
 } Tree;
 
-int rnt_counter = 0;
+#define MAX_RNT 1000 //reemplazce el int rnt_counter por esta variable tipo bolean para verificar si esta libre el rnt para reasirnarlo
+bool rnt_usados[MAX_RNT] = {false};
+
+
+// liberar rnt
+void liberarRNT(int rnt) {
+    if (rnt > 0 && rnt < MAX_RNT) {
+        rnt_usados[rnt] = false; // Marcar como no usado.
+    }
+}
+
 
 // crear un nuevo nodo
 Tree* nuevoNodo(Fecha reg, const char* empresa, int rnt) {
@@ -47,10 +57,27 @@ int compararFechas(Fecha a, Fecha b) {
         return a.dia - b.dia;
 }
 
+//asigna el rnt solo si no lo tiene
+int obtenerSiguienteRNT() {
+    for (int i = 1; i < MAX_RNT; i++) {
+        if (!rnt_usados[i]) {
+            rnt_usados[i] = true; // Marcar como usado.
+            return i;
+        }
+    }
+    return -1; // No hay RNTs disponibles.
+}
+
+
 // Funcion para insertar un nuevo nodo con una fecha de vencimiento en el arbol 
 Tree* insertar(Tree* nodo, Fecha venc, const char* empresa) {
     if (nodo == NULL) {
-        return nuevoNodo(venc, empresa, ++rnt_counter);
+        int rnt = obtenerSiguienteRNT();
+        if (rnt == -1) {
+            printf("No hay más RNTs disponibles.\n");
+            return NULL;
+        }
+        return nuevoNodo(venc, empresa, rnt);
     }
     if (compararFechas(venc, nodo->vencimiento) < 0) {
         nodo->izq = insertar(nodo->izq, venc, empresa);
@@ -59,13 +86,7 @@ Tree* insertar(Tree* nodo, Fecha venc, const char* empresa) {
     }
     return nodo;
 }
-
 // fincion debug de busqueda 
-
-/*Esta funcion es unicamente para mostrar los datos ingresados por el usuario,
-para ver si las funciones recorridas hace su funcion como se debe.
-Esta opcion no estara al final del proyecto*/
-
 void mostrarFecha(Tree* raiz) {
     if (raiz == nullptr) {
         return;
@@ -93,20 +114,21 @@ Tree* buscarPorFecha(Tree* raiz, Fecha fechaBuscada) {
     }
 }
 
-
 Tree* buscarPorRNT(Tree* raiz, int rntBuscado) {
     if (raiz == nullptr) {
-        return nullptr; // no se encontro el RNT.
+        return nullptr; // No se encontró el RNT.
     }
     if (raiz->rnt == rntBuscado) {
-        return raiz; // si el RNT del nodo actual coincide, devuelve el nodo.
+        return raiz; // Si el RNT del nodo actual coincide, devuelve el nodo.
     }
-    if (rntBuscado < raiz->rnt) {
-        return buscarPorRNT(raiz->izq, rntBuscado); // si el RNT buscado es menor, busca en el subarbol izquierdo
-    } else {
-        return buscarPorRNT(raiz->der, rntBuscado); // buscado si es mayor, busca en el subarbol derecho
+    Tree* resultadoIzq = buscarPorRNT(raiz->izq, rntBuscado); // Busca en el subárbol izquierdo.
+    if (resultadoIzq != nullptr) {
+        return resultadoIzq; // Si se encontró en el subárbol izquierdo, devuelve el resultado.
     }
+    Tree* resultadoDer = buscarPorRNT(raiz->der, rntBuscado); // Busca en el subárbol derecho.
+    return resultadoDer; // Devuelve el resultado del subárbol derecho (puede ser nullptr si no se encuentra).
 }
+
 
 
 void preorden(Tree* nodo) {
@@ -148,6 +170,64 @@ void posorden(Tree* nodo) {
 }
 
 
+// Función para encontrar el mínimo en un árbol binario de búsqueda
+Tree* encontrarMinimo(Tree* nodo) {
+    printf("Encontrar mínimo, nodo actual: %p\n", nodo);
+    Tree* actual = nodo;
+    // El mínimo es el nodo más a la izquierda
+    while (actual && actual->izq != NULL) {
+        printf("Encontrar mínimo, nodo izq: %p\n", actual->izq);
+        actual = actual->izq;
+    }
+    printf("Encontrar mínimo, retornando %p\n", actual);
+    return actual;
+}
+
+Tree* eliminarNodo(Tree* raiz, Fecha venc) {
+    if (raiz == NULL) {
+        printf("No se encontró el nodo con la fecha dada.\n");
+        return NULL; // No hay nodo para eliminar.
+    }
+
+    // Si la fecha a eliminar es menor que la raíz, entonces está en el subárbol izquierdo
+    if (compararFechas(venc, raiz->vencimiento) < 0) {
+        raiz->izq = eliminarNodo(raiz->izq, venc);
+    }
+    // Si la fecha a eliminar es mayor que la raíz, entonces está en el subárbol derecho
+    else if (compararFechas(venc, raiz->vencimiento) > 0) {
+        raiz->der = eliminarNodo(raiz->der, venc);
+    }
+    // Si la fecha es igual a la raíz, entonces este es el nodo a eliminar
+    else {
+         // Antes de eliminar el nodo, liberar su RNT.
+        liberarRNT(raiz->rnt);
+        // Nodo con solo un hijo o sin hijos
+        if (raiz->izq == NULL) {
+            Tree* temp = raiz->der;
+            free(raiz);
+            raiz = temp;
+        }
+        else if (raiz->der == NULL) {
+            Tree* temp = raiz->izq;
+            free(raiz);
+            raiz = temp;
+        }
+        // Nodo con dos hijos: obtener el sucesor inorden (el mínimo en el subárbol derecho)
+        else {
+            Tree* temp = encontrarMinimo(raiz->der);
+            // Copiar el sucesor inorden en este nodo
+            raiz->vencimiento = temp->vencimiento;
+            strcpy(raiz->empresa, temp->empresa);
+            raiz->rnt = temp->rnt;
+            // Eliminar el sucesor inorden
+            raiz->der = eliminarNodo(raiz->der, temp->vencimiento);
+        }
+        
+    }
+    return raiz; // Devuelve la nueva raíz del árbol después de la eliminación
+}
+
+
 
 //menu del programa
 int menu() {
@@ -158,6 +238,7 @@ int menu() {
     printf("3. Buscar fecha\n");
     printf("4. Buscar RNT\n");
     printf("5. Tipos de recorrido\n");
+    printf("6. Eliminar nodo por fecha\n");
     printf("0. Salir\n");
     printf("======================================\n");
     printf("Ingrese una opcion: ");
@@ -165,7 +246,7 @@ int menu() {
     return opcion;
 }
 
-// liberar memoria
+// liberar memoria para nodo
 void liberarMemoria(Tree* nodo) {
     if (nodo == NULL)
         return;
@@ -218,7 +299,7 @@ int main() {
                 }
                 else
                 {
-                    printf("\nFecha no encontrada en el árbol.\n");
+                    printf("\nFecha no encontrada en el arbol.\n");
                 }
 
                 break;
@@ -276,20 +357,33 @@ int main() {
 
                 
                 default:
-                    printf("Opción no válida.\n");
+                    printf("Opción no valida.\n");
                 }
 
                 break;
             }
+            case 6:
+            {
+                printf("\nEliminar nodo\n");
+                printf("--------------------\n");
 
-        }
+                int anio, mes, dia;
+                printf("Ingrese la fecha del nodo a eliminar (formato AAAA MM DD): ");
+                scanf("%d %d %d", &anio, &mes, &dia);
+                Fecha vencimiento = {dia, mes, anio + 5};
+
+                raiz = eliminarNodo(raiz, vencimiento);
+
+                printf("nodo eliminado correctamente.\n");
+
+                break;
+            }
+
+                
+
+        } 
     } while (opcion != 0);
 
     liberarMemoria(raiz);
     return 0;
 }
-
-
-
-
-

@@ -1,0 +1,68 @@
+
+1. **Reemplazo de `rnt_counter` por `MAX_RNT`:**
+   Se eliminó la variable global `rnt_counter` y se introdujo una constante `MAX_RNT` con un valor de 1000 para definir el número máximo de RNTs posibles. Esto ayuda a prevenir la asignación de RNTs más allá de un límite predefinido.
+
+   ```c
+   #define MAX_RNT 1000
+   ```
+
+2. **Sistema de Seguimiento de RNTs:**
+   Se implementó un arreglo `rnt_usados` para llevar un registro de los RNTs que están en uso y los que están disponibles. Esto permite reutilizar los RNTs de los nodos eliminados.
+
+   ```c
+   bool rnt_usados[MAX_RNT] = {false};
+   ```
+
+3. **Función `obtenerSiguienteRNT`:**
+   Se creó una nueva función para buscar el próximo RNT disponible en el arreglo `rnt_usados`.
+
+   ```c
+   int obtenerSiguienteRNT() {
+       // ... código para obtener el siguiente RNT disponible ...
+   }
+   ```
+
+4. **Función `liberarRNT`:**
+   Se añadió una función para marcar un RNT como no utilizado cuando se elimina un nodo.
+
+   ```c
+   void liberarRNT(int rnt) {
+       // ... código para liberar un RNT ...
+   }
+   ```
+
+5. **Modificación de la Función `insertar`:**
+   La función `insertar` ahora utiliza `obtenerSiguienteRNT` para asignar RNTs a los nuevos nodos, asegurando que no se asignen RNTs ya utilizados.
+
+   ```c
+   Tree* insertar(Tree* nodo, Fecha venc, const char* empresa) {
+       // ... código modificado para la inserción ...
+   }
+   ```
+
+6. **Opción de Eliminar Nodo:**
+   Se agregó una nueva opción al menú del programa para permitir a los usuarios eliminar nodos por fecha de vencimiento.
+
+   ```c
+   // ... código del menú para eliminar nodos ...
+   ```
+
+7. **Modificación de la Función `eliminarNodo`:**
+   La función `eliminarNodo` fue actualizada para llamar a `liberarRNT` y así liberar el RNT del nodo eliminado.
+
+   ```c
+   Tree* eliminarNodo(Tree* raiz, Fecha venc) {
+       // ... código modificado para la eliminación ...
+   }
+   ```
+
+
+
+8. **Corrección en la Búsqueda por RNT:**
+   Se corrigió la función `buscarPorRNT` para que busque en ambos subárboles y encuentre correctamente el nodo basado en el RNT proporcionado.
+
+   ```c
+   Tree* buscarPorRNT(Tree* raiz, int rntBuscado) {
+       // ... código corregido para la búsqueda por RNT ...
+   }
+   ```
