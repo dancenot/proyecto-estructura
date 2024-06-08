@@ -2,9 +2,16 @@
 #include <cstdlib>
 #include <cstring> 
 #include <limits>
+#include <queue>
+#include <vector>
 using namespace std;
 
 /* verison 1.0.8*/
+struct Pasajero {
+    char nombre[50];
+    int edad;
+    // Otros datos del pasajero
+};
 
 struct nodo {
     int value; 
@@ -14,13 +21,17 @@ struct nodo {
     double precio;
     char destino[50];
     int capacidad;
-    char idViaje[15]; // formato XXYYYYMMDD
+    char idViaje[20]; // Cambia a un array de caracteres
     nodo *izq;
     nodo *der;
     int altura;
+    Pasajero pasajeros[100]; // Array para pasajeros
+    int numPasajeros; // Número de pasajeros registrados
 };
-struct nodo *raiz, *aux;
 
+
+
+struct nodo *raiz, *aux;
 
 // prototipos de funciones adicionales
 void generarIdentificador(nodo *n);
@@ -28,7 +39,8 @@ int obtenerAltura(struct nodo *n);
 int obtenerBalance(struct nodo *n);
 struct nodo* rotarDerecha(struct nodo *n);
 struct nodo* rotarIzquierda(struct nodo *n);
-
+void liberarnodo(nodo *n);
+nodo* minValueNode(nodo* node);
 
 nodo* crearNodo() {
     nodo *nuevoNodo = (nodo *)malloc(sizeof(nodo));
@@ -36,8 +48,6 @@ nodo* crearNodo() {
         cerr << "Error al asignar memoria." << endl;
         return NULL;
     }
-    memset(nuevoNodo, 0, sizeof(nodo)); // inicializa con ceros para evitar datos basura
-
     nuevoNodo->izq = NULL;
     nuevoNodo->der = NULL;
     nuevoNodo->altura = 1; 
@@ -47,6 +57,7 @@ nodo* crearNodo() {
 
 void rellenarDatosNodo(nodo *n) {
     cout << "Ingrese la matricula de la embarcacion: ";
+    cin.ignore(); // Limpiar el buffer antes de leer la cadena
     cin.getline(n->matricula, 20);
     cout << "Ingrese el nombre de la embarcacion: ";
     cin.getline(n->nombreEmbarcacion, 50);
@@ -54,36 +65,23 @@ void rellenarDatosNodo(nodo *n) {
     cin.getline(n->fecha, 11);
     cout << "Ingrese el precio del viaje: ";
     cin >> n->precio;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Limpiar el buffer
     cout << "Ingrese el destino del viaje: ";
     cin.getline(n->destino, 50);
     cout << "Ingrese la capacidad de la embarcacion: ";
     cin >> n->capacidad;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Limpiar el buffer
     // Generar el identificador
     generarIdentificador(n);
 }
 
-
-
-
-/* el buffer es una memoria dinamica que alamacena datos temporales y despues los procesa
-esto permine que el programa no se bloquee con muchos datos, ademas reduce la cantidad de llamadas a funciones*/
-
-/* con el sizeof se define el tamanio de la variable ejemplo:
-matricula[20]
-sizeof(nuevoNodo->matricula) indica que el tamaño esta limitado a 20 caracteres por lo que el sizeof asegura que el tamaño sea el correcto
-y no haya un desborde en el bufer almacenado*/
-
-
-
-
-//como lo puse en la funcion genera una ID
 void generarIdentificador(nodo *viaje) {
-    strncpy(viaje->idViaje, viaje->matricula, 2);
-    strncpy(viaje->idViaje + 2, viaje->fecha + 6, 4);
-     strncpy(viaje->idViaje + 8, viaje->fecha, 2);
-   strncpy(viaje->idViaje + 6, viaje->fecha + 3, 2);
-    viaje->idViaje[10] = '\0';
+    int dia, mes, anio;
+    sscanf(viaje->fecha, "%d/%d/%d", &dia, &mes, &anio);
+    snprintf(viaje->idViaje, sizeof(viaje->idViaje), "%c%c%04d%02d%02d", 
+             viaje->matricula[0], viaje->matricula[1], anio, mes, dia);
 }
+
 
 int mayor(int a, int b) {
     return (a > b) ? a : b;
@@ -94,9 +92,9 @@ struct nodo* insertar(struct nodo* raiz, struct nodo* nuevoNodo) {
         return nuevoNodo;
     }
 
-    if (nuevoNodo->value < raiz->value) {
+    if (nuevoNodo->idViaje < raiz->idViaje) {
         raiz->izq = insertar(raiz->izq, nuevoNodo);
-    } else if (nuevoNodo->value > raiz->value) {
+    } else if (nuevoNodo->idViaje > raiz->idViaje) {
         raiz->der = insertar(raiz->der, nuevoNodo);
     } else {
         // si el valor ya existe en el arbol, no se inserta el duplicado
@@ -108,20 +106,20 @@ struct nodo* insertar(struct nodo* raiz, struct nodo* nuevoNodo) {
     int balance = obtenerBalance(raiz);
 
     // Rotaciones para balancear el arbol
-    if (balance > 1 && nuevoNodo->value < raiz->izq->value) {
+    if (balance > 1 && nuevoNodo->idViaje < raiz->izq->idViaje) {
         return rotarDerecha(raiz);
     }
 
-    if (balance < -1 && nuevoNodo->value > raiz->der->value) {
+    if (balance < -1 && nuevoNodo->idViaje > raiz->der->idViaje) {
         return rotarIzquierda(raiz);
     }
 
-    if (balance > 1 && nuevoNodo->value > raiz->izq->value) {
+    if (balance > 1 && nuevoNodo->idViaje > raiz->izq->idViaje) {
         raiz->izq = rotarIzquierda(raiz->izq);
         return rotarDerecha(raiz);
     }
 
-    if (balance < -1 && nuevoNodo->value < raiz->der->value) {
+    if (balance < -1 && nuevoNodo->idViaje < raiz->der->idViaje) {
         raiz->der = rotarDerecha(raiz->der);
         return rotarIzquierda(raiz);
     }
@@ -129,15 +127,12 @@ struct nodo* insertar(struct nodo* raiz, struct nodo* nuevoNodo) {
     return raiz;
 }
 
-
-
 int obtenerAltura(struct nodo *n) {
     if (n == NULL) {
         return 0;
     }
     return n->altura;
 }
-
 
 struct nodo* rotarDerecha(struct nodo *y) {
     struct nodo *x = y->izq;
@@ -172,7 +167,6 @@ int obtenerBalance(struct nodo *n) {
     return obtenerAltura(n->izq) - obtenerAltura(n->der);
 }
 
-
 void liberarnodo(nodo *n) {
     if (n != NULL) {
         liberarnodo(n->izq);
@@ -182,29 +176,23 @@ void liberarnodo(nodo *n) {
 }
 
 // busca un viaje por su identificador
-void buscarViaje(nodo *raiz, const char *idBuscado) {
+nodo* buscarViaje(nodo *raiz, const char* idBuscado) {
     if (raiz == NULL) {
         cout << "El viaje con identificador " << idBuscado << " no se encuentra en el sistema." << endl;
-        return;
+        return NULL;
     }
     if (strcmp(idBuscado, raiz->idViaje) == 0) {
-        cout << "Detalles del viaje:" << endl;
-        cout << "Identificador Unico: " << raiz->idViaje << endl;
-        cout << "Matricula de la embarcacion: " << raiz->matricula << endl;
-        cout << "Nombre de la embarcacion: " << raiz->nombreEmbarcacion << endl;
-        cout << "Fecha del viaje: " << raiz->fecha << endl;
-        cout << "Precio del viaje: " << raiz->precio << endl;
-        cout << "Destino del viaje: " << raiz->destino << endl;
-        cout << "Capacidad de la embarcacion: " << raiz->capacidad << endl;
+        return raiz;
     } else if (strcmp(idBuscado, raiz->idViaje) < 0) {
-        buscarViaje(raiz->izq, idBuscado);
+        return buscarViaje(raiz->izq, idBuscado);
     } else {
-        buscarViaje(raiz->der, idBuscado);
+        return buscarViaje(raiz->der, idBuscado);
     }
 }
 
 
-//recorre el arbol en inorden y listar los viajes
+
+// recorre el arbol en inorden y listar los viajes
 void listarViajes(nodo *raiz) {
     if (raiz != NULL) {
         listarViajes(raiz->izq); // Visita el rama izquierda
@@ -218,7 +206,118 @@ void listarViajes(nodo *raiz) {
         cout << "Capacidad de la embarcacion: " << raiz->capacidad << endl;
         cout << "--------------------------" << endl;
         listarViajes(raiz->der); // Visita la rama derecha
-    };
+    }
+}
+void registrarPasajero(nodo *viaje, const Pasajero &pasajero) {
+    if (viaje->numPasajeros < viaje->capacidad) {
+        viaje->pasajeros[viaje->numPasajeros++] = pasajero;
+        cout << "Pasajero registrado exitosamente." << endl;
+    } else {
+        cout << "La capacidad de la embarcacion ha sido alcanzada." << endl;
+    }
+}
+
+
+
+
+void buscarPreorden(nodo *raiz) {
+    if (raiz != NULL) {
+        for (int i = 0; i < raiz->numPasajeros; ++i) {
+            cout << "Nombre: " << raiz->pasajeros[i].nombre << ", Edad: " << raiz->pasajeros[i].edad << endl;
+        }
+        buscarPreorden(raiz->izq);
+        buscarPreorden(raiz->der);
+    }
+}
+
+void buscarInorden(nodo *raiz) {
+    if (raiz != NULL) {
+        buscarInorden(raiz->izq);
+        for (int i = 0; i < raiz->numPasajeros; ++i) {
+            cout << "Nombre: " << raiz->pasajeros[i].nombre << ", Edad: " << raiz->pasajeros[i].edad << endl;
+        }
+        buscarInorden(raiz->der);
+    }
+}
+
+void buscarPosorden(nodo *raiz) {
+    if (raiz != NULL) {
+        buscarPosorden(raiz->izq);
+        buscarPosorden(raiz->der);
+        for (int i = 0; i < raiz->numPasajeros; ++i) {
+            cout << "Nombre: " << raiz->pasajeros[i].nombre << ", Edad: " << raiz->pasajeros[i].edad << endl;
+        }
+    }
+}
+
+
+
+
+
+
+
+nodo* eliminarViaje(nodo* raiz, const char* idViaje) {
+    if (raiz == NULL) {
+        return raiz;
+    }
+
+    if (strcmp(idViaje, raiz->idViaje) < 0) {
+        raiz->izq = eliminarViaje(raiz->izq, idViaje);
+    } else if (strcmp(idViaje, raiz->idViaje) > 0) {
+        raiz->der = eliminarViaje(raiz->der, idViaje);
+    } else {
+        if ((raiz->izq == NULL) || (raiz->der == NULL)) {
+            nodo *temp = raiz->izq ? raiz->izq : raiz->der;
+            if (temp == NULL) {
+                temp = raiz;
+                raiz = NULL;
+            } else {
+                *raiz = *temp;
+            }
+            free(temp);
+        } else {
+            nodo* temp = minValueNode(raiz->der);
+            strcpy(raiz->idViaje, temp->idViaje);
+            raiz->der = eliminarViaje(raiz->der, temp->idViaje);
+        }
+    }
+
+    if (raiz == NULL) {
+        return raiz;
+    }
+
+    raiz->altura = 1 + mayor(obtenerAltura(raiz->izq), obtenerAltura(raiz->der));
+
+    int balance = obtenerBalance(raiz);
+
+    if (balance > 1 && obtenerBalance(raiz->izq) >= 0) {
+        return rotarDerecha(raiz);
+    }
+
+    if (balance > 1 && obtenerBalance(raiz->izq) < 0) {
+        raiz->izq = rotarIzquierda(raiz->izq);
+        return rotarDerecha(raiz);
+    }
+
+    if (balance < -1 && obtenerBalance(raiz->der) <= 0) {
+        return rotarIzquierda(raiz);
+    }
+
+    if (balance < -1 && obtenerBalance(raiz->der) > 0) {
+        raiz->der = rotarDerecha(raiz->der);
+        return rotarIzquierda(raiz);
+    }
+
+    return raiz;
+}
+
+
+nodo* minValueNode(nodo* node) {
+    nodo* current = node;
+    while (current->izq != NULL) {
+        current = current->izq;
+    }
+    return current;
 }
 
 int main() {
@@ -235,47 +334,91 @@ int main() {
         cout << "7. Salir." << endl;
         cout << "Seleccione una opcion: ";
         cin >> opcion;
-        nodo *aux = NULL; // Ajuste: Inicializa aux en cada iteración
+        nodo *aux = NULL; // Inicializa aux en cada iteración
+        nodo *viaje = NULL; // Declarar la variable viaje fuera del switch
         switch (opcion) {
             case 1:
                 aux = crearNodo();
-                
                 rellenarDatosNodo(aux);
-                
                 raiz = insertar(raiz, aux);
                 break;
             case 2: {
-                char idBuscado[15];
+                char idBuscado[20];
                 cout << "Ingrese el identificador del viaje a buscar: ";
-                cin.ignore();
-                cin.getline(idBuscado, 15);
-                buscarViaje(raiz, idBuscado);
+                cin >> idBuscado;
+                viaje = buscarViaje(raiz, idBuscado);
+                if (viaje != NULL) {
+                    cout << "Detalles del viaje:" << endl;
+                    cout << "Identificador Unico: " << viaje->idViaje << endl;
+                    cout << "Matricula de la embarcacion: " << viaje->matricula << endl;
+                    cout << "Nombre de la embarcacion: " << viaje->nombreEmbarcacion << endl;
+                    cout << "Fecha del viaje: " << viaje->fecha << endl;
+                    cout << "Precio del viaje: " << viaje->precio << endl;
+                    cout << "Destino del viaje: " << viaje->destino << endl;
+                    cout << "Capacidad de la embarcacion: " << viaje->capacidad << endl;
+                }
                 break;
             }
             case 3:
                 listarViajes(raiz);
                 break;
-            case 4:
-                // Lógica para eliminar un viaje por identificador
+            case 4: {
+                char idEliminar[20];
+                cout << "Ingrese el identificador del viaje a eliminar: ";
+                cin >> idEliminar;
+                raiz = eliminarViaje(raiz, idEliminar);
                 break;
-            case 5:
-                // Lógica para registrar un pasajero en un viaje
+            }
+            case 5: {
+                char idViaje[20];
+                cout << "Ingrese el identificador del viaje: ";
+                cin >> idViaje;
+                viaje = buscarViaje(raiz, idViaje);
+                if (viaje != NULL) {
+                    Pasajero pasajero;
+                    cout << "Ingrese el nombre del pasajero: ";
+                    cin.ignore();
+                    cin.getline(pasajero.nombre, 50);
+                    cout << "Ingrese la edad del pasajero: ";
+                    cin >> pasajero.edad;
+                    registrarPasajero(viaje, pasajero);
+                }
                 break;
-            case 6:
-                // Lógica para listar todos los pasajeros de un viaje
+            }
+            case 6: {
+                int subOpcion;
+                cout << "Seleccione el tipo de búsqueda:" << endl;
+                cout << "1. Preorden" << endl;
+                cout << "2. Inorden" << endl;
+                cout << "3. Posorden" << endl;
+                cout << "Seleccione una opcion: ";
+                cin >> subOpcion;
+
+                switch (subOpcion) {
+                    case 1:
+                        cout << "Resultados de la búsqueda preorden:" << endl;
+                        buscarPreorden(raiz);
+                        break;
+                    case 2:
+                        cout << "Resultados de la búsqueda inorden:" << endl;
+                        buscarInorden(raiz);
+                        break;
+                    case 3:
+                        cout << "Resultados de la búsqueda posorden:" << endl;
+                        buscarPosorden(raiz);
+                        break;
+                    default:
+                        cout << "Opcion no valida. Intente de nuevo." << endl;
+                }
                 break;
+            }
             case 7:
                 cout << "Gracias por utilizar el sistema." << endl;
                 break;
             default:
                 cout << "Opcion no valida. Intente de nuevo." << endl;
         }
-        if (aux != NULL) {
-            free(aux);
-            aux = NULL;
-        }
     } while (opcion != 7);
     liberarnodo(raiz);
     return 0;
 }
-
